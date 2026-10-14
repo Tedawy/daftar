@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="104" fill="#13211E"/>
+  <!-- the balance column: the one rule that matters on a ledger page -->
+  <rect x="86" y="118" width="12" height="276" rx="6" fill="#0E8C7C"/>
+  <!-- entry rows, right to left, lengths falling like a settled account -->
+  <rect x="130" y="140" width="286" height="26" rx="13" fill="#F3F2EC"/>
+  <rect x="130" y="196" width="222" height="26" rx="13" fill="#F3F2EC" opacity=".82"/>
+  <rect x="130" y="252" width="258" height="26" rx="13" fill="#C98A63"/>
+  <rect x="130" y="308" width="166" height="26" rx="13" fill="#F3F2EC" opacity=".64"/>
+  <rect x="130" y="364" width="122" height="26" rx="13" fill="#4FBCAB"/>
+</svg>
