@@ -1,20 +1,142 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#1A221F" />
-    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="الدفتر" />
-    <meta name="description" content="كشف حساب الموردين والعملاء — يعمل بدون إنترنت" />
-    <title>دفتر الحسابات</title>
-    <script type="module" crossorigin src="/daftar/assets/index-DtCfsDLK.js"></script>
-    <link rel="stylesheet" crossorigin href="/daftar/assets/index-ByeLv8hZ.css">
-  <link rel="manifest" href="/daftar/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/daftar/registerSW.js"></script></head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>دفتر الحسابات — اتنقل</title>
+<link rel="icon" href="icon.svg">
+<style>
+  :root{color-scheme:light;--bg:#F3F2EC;--surface:#FFFDF7;--ink:#1A221F;--ink-2:#4A544F;
+        --ink-3:#7C857F;--line:#E2DFD2;--green:#15594A;--r:10px}
+  *{box-sizing:border-box}
+  body{margin:0;padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));
+       background:var(--bg);color:var(--ink);
+       font:15px/1.7 "IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",sans-serif;
+       display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+        padding:26px 22px;max-width:460px;width:100%}
+  h1{font-family:Amiri,"Times New Roman",serif;font-size:27px;margin:0 0 4px;line-height:1.25}
+  .sub{color:var(--ink-3);font-size:12.5px;margin:0 0 20px}
+  p{margin:0 0 14px;color:var(--ink-2)}
+  .btn{display:block;width:100%;text-align:center;padding:12px 14px;border-radius:var(--r);
+       border:1px solid var(--line);background:var(--surface);color:var(--ink);
+       font:inherit;font-size:15px;cursor:pointer;text-decoration:none;margin-bottom:10px}
+  .btn-primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+  .box{border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:18px 0;
+       background:#FAF8F0}
+  .box b{color:var(--ink)}
+  .fine{font-size:12px;color:var(--ink-3);line-height:1.6;margin:0}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>الدفتر اتنقل</h1>
+  <p class="sub">حساب الموردين والعملاء — حاصلات زراعية</p>
+
+  <p>
+    الدفتر بقى على عنوان جديد، وبقى بيشتغل بحساب بإيميل وكلمة سر — يعني نفس الدفتر
+    يفتح معاك على الموبايل وعلى الكمبيوتر، ولو كتبت وإنت من غير نت بيترفع لوحده أول
+    ما النت يرجع.
+  </p>
+
+  <a class="btn btn-primary" href="https://tedawy.github.io/daftar-app/">افتح الدفتر الجديد</a>
+
+  <!-- Shown ONLY when this browser actually holds a ledger. Retiring the app would
+       otherwise strand it: the export button lived inside the app being replaced,
+       so this page has to be able to hand the data back by itself. -->
+  <div class="box" id="has-data" hidden>
+    <p><b>فيه دفتر متسجّل على المتصفح ده.</b></p>
+    <p id="counts" class="fine"></p>
+    <p class="fine" style="margin:10px 0">
+      البيانات لسه موجودة ومحدش مسحها. نزّلها كملف من هنا، وبعدين من الدفتر الجديد:
+      الإعدادات ← استيراد نسخة.
+    </p>
+    <button class="btn" id="dl">نزّل نسخة من الدفتر</button>
+  </div>
+
+  <p class="fine" id="no-data" hidden>
+    مفيش بيانات متسجّلة على المتصفح ده — افتح العنوان الجديد وابدأ منه على طول.
+  </p>
+</div>
+
+<script>
+// The old app registered a service worker that precaches its shell. Left alone it
+// would keep serving the retired app from cache and nobody would ever see this
+// page. Unregister it and drop its caches — the ledger lives in IndexedDB, which
+// is untouched by any of this.
+(async () => {
+  try {
+    const regs = await navigator.serviceWorker?.getRegistrations?.() ?? [];
+    await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches?.keys?.() ?? [];
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch (e) { /* private window, or unsupported — the page still works */ }
+})();
+
+const read = (dbh, store) => new Promise(res => {
+  try {
+    const q = dbh.transaction(store, "readonly").objectStore(store).getAll();
+    q.onsuccess = () => res(q.result || []);
+    q.onerror = () => res([]);
+  } catch (e) { res([]); }
+});
+
+(async () => {
+  let dbh;
+  try {
+    dbh = await new Promise((res, rej) => {
+      // No version number: open whatever exists, and never CREATE one. Passing a
+      // version here would upgrade — or worse, make an empty database and then
+      // cheerfully report that the ledger is gone.
+      const req = indexedDB.open("daftar");
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+      req.onupgradeneeded = () => { try { req.transaction.abort(); } catch (e) {} rej(new Error("absent")); };
+    });
+  } catch (e) {
+    document.getElementById("no-data").hidden = false;
+    return;
+  }
+
+  const names = [...dbh.objectStoreNames];
+  const [accounts, entries, crops] = await Promise.all([
+    names.includes("accounts") ? read(dbh, "accounts") : [],
+    names.includes("entries")  ? read(dbh, "entries")  : [],
+    names.includes("crops")    ? read(dbh, "crops")    : [],
+  ]);
+
+  if (!accounts.length && !entries.length) {
+    document.getElementById("no-data").hidden = false;
+    return;
+  }
+
+  const live = r => !r.deleted_at;
+  // An Arabic comma, not the "·" the app uses in its chips: with a number on each
+  // side and the line running right-to-left, the dot sits between two digits and
+  // the pair can read as one number. This is the only place the count stands alone
+  // with nothing around it to disambiguate.
+  document.getElementById("counts").textContent =
+    `${accounts.filter(live).length} حساب، ${entries.filter(live).length} حركة`;
+  document.getElementById("has-data").hidden = false;
+
+  document.getElementById("dl").onclick = () => {
+    // Byte-for-byte the shape lib/backup.ts writes, so the new app's importer
+    // takes it without knowing it came from here.
+    const data = {
+      format: "daftar-backup",
+      version: 1,
+      exported_at: new Date().toISOString(),
+      accounts, entries, crops,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `دفتر-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+})();
+</script>
+</body>
 </html>
